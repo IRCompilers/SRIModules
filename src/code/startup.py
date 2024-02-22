@@ -16,5 +16,5 @@ else:
     tokenized_documents = LoadDocuments()
 
 dictionary, corpus, tfidf, index = Vectorize(tokenized_documents)
-result = Query("engineer not wing", dictionary, tfidf, index)
+result = Query("great not wing", dictionary, tfidf, index)
 print(result)

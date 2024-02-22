@@ -1,4 +1,4 @@
-from sympy import symbols, sympify, to_dnf, And, Or, preorder_traversal, Not
+from sympy import sympify, to_dnf, And, Or, Not
 
 from src.code.tokenizer import Tokenize
 
@@ -47,18 +47,17 @@ def performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index):
     return relevant_docs
 
 
-# Usage:
-# relevant_docs = perform_tfidf_query(logical_exp, dictionary, tfidf, index)
-# print(relevant_docs)
-
 def queryToDfn(query_document):
     operators = ["and", "or", "not"]
+
+    print("Query: ", query_document)
 
     temp = ""
     for i in range(len(query_document)):
         if i == len(query_document) - 1:
             temp += query_document[i]
-        elif query_document[i] not in operators and query_document[i + 1] not in operators:
+        elif query_document[i] not in operators and (
+                query_document[i + 1] not in operators or query_document[i + 1] == "not"):
             temp += query_document[i] + " and "
         else:
             temp += query_document[i] + " "
