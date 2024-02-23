@@ -17,13 +17,16 @@ def evaluateExpression(expr, sims_dict):
 
     relevant_docs = set()
     if isinstance(expr, And):
-        for clause in clauses:
+        relevant_docs = set([docId for (docId, docScore) in sims_dict[str(clauses[0])] if docScore > 0.0])
+        for clause in clauses[1:]:
             relevant_docs = relevant_docs.intersection(evaluateExpression(clause, sims_dict))
     elif isinstance(expr, Or):
-        for clause in clauses:
+        relevant_docs = set([docId for (docId, docScore) in sims_dict[str(clauses[0])] if docScore > 0.0])
+        for clause in clauses[1:]:
             relevant_docs = relevant_docs.union(evaluateExpression(clause, sims_dict))
     elif isinstance(expr, Not):
-        relevant_docs = relevant_docs.difference(evaluateExpression(clauses[0], sims_dict))
+        notOccurrences = [docId for (docId, docScore) in sims_dict[str(expr.args[0])] if docScore < 0.000001]
+        relevant_docs = set(notOccurrences)
     else:
         relevant_docs = set([docId for (docId, docScore) in sims_dict[str(expr)] if docScore > 0.0])
 
@@ -33,13 +36,15 @@ def evaluateExpression(expr, sims_dict):
 def performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index):
     # Parse the logical expression to get the individual symbols (terms)
     terms = query_document
+    print("Query: ", query_document)
+    print("Terms: ", terms)
 
     # Perform a TF-IDF query for each term and store the results in a dictionary
     sims_dict = {}
     for term in terms:
         query_bow = dictionary.doc2bow([term])
         sims = index[tfidf[query_bow]]
-        sims_dict[term] = [(docId, docScore) for (docId, docScore) in enumerate(sims) if docScore > 0.0]
+        sims_dict[term] = [(docId, docScore) for (docId, docScore) in enumerate(sims)]
 
     # Evaluate the logical expression using the dictionary of similarity scores
     relevant_docs = evaluateExpression(logical_exp, sims_dict)
@@ -49,8 +54,6 @@ def performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index):
 
 def queryToDfn(query_document):
     operators = ["and", "or", "not"]
-
-    print("Query: ", query_document)
 
     temp = ""
     for i in range(len(query_document)):
