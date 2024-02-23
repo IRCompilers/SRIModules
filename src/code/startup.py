@@ -17,5 +17,5 @@ if __name__ == "__main__":
         tokenized_documents = LoadDocuments()
 
     dictionary, corpus, tfidf, index = Vectorize(tokenized_documents)
-    result = Query("wing not fire", dictionary, tfidf, index)
+    result = Query("The plane is a giant flying machine", dictionary, tfidf, index)
     print(result)
