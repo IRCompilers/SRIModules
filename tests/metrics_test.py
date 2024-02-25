@@ -2,7 +2,7 @@ import os
 
 import ir_datasets
 import numpy as np
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, fbeta_score
 
 from src.code.boolean_model import BooleanModel
 from src.code.io import SaveDocuments, LoadDocuments
@@ -62,11 +62,13 @@ if __name__ == "__main__":
     precision = precision_score(y_true, y_pred)
     recall = recall_score(y_true, y_pred)
     f1 = f1_score(y_true, y_pred)
+    f3 = fbeta_score(y_true, y_pred, beta=3)
     r_precision = precision_score(y_true[:20], y_pred[:20])
     print("Confusion Matrix:")
     print(conf)
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")
     print(f"F1 Score: {f1}")
+    print(f"F3 Score: {f3}")
     print(f"R-Precision: {r_precision}")
     print("\n")
