@@ -42,5 +42,3 @@ class BooleanModel:
                 relevant_docs = set([docId for (docId, docText) in self.corpus if term in docText])
 
         return relevant_docs
-
-

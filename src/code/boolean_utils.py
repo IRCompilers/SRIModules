@@ -36,8 +36,6 @@ def QueryToDfn(query_document):
     if len(processed_query) == 0:
         return None
 
-
-
     try:
         query_expr = sympify(processed_query, evaluate=False)
         query_dnf = to_dnf(query_expr, simplify=True, force=True)
