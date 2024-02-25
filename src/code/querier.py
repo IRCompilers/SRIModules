@@ -1,8 +1,9 @@
 import nltk
 from nltk.corpus import wordnet
 from nltk.wsd import lesk
-from sympy import sympify, to_dnf, And, Or, Not
+from sympy import sympify, to_dnf, And, Or, Not, SympifyError
 
+from src.code.boolean_utils import QueryToDfn, ReplaceReservedKeywords
 from src.code.tokenizer import Tokenize
 
 
@@ -10,25 +11,26 @@ def get_synonyms(word):
     synonyms = []
     for syn in wordnet.synsets(word):
         for lemma in syn.lemmas():
-            synonyms.append(lemma.name())
+            if len(lemma.name()) > 1:
+                synonyms.append(lemma.name())
     return synonyms
 
 
 def disambiguate(word, sentence):
     best_synset = lesk(nltk.word_tokenize(sentence), word)
     if best_synset is not None:
-        return best_synset.lemma_names()
+        return [name for name in best_synset.lemma_names() if len(name) > 1]
     else:
         return []
 
 
 def getFirstNotEqual(lemmas, term):
     for lemma in lemmas:
-        if lemma != term:
+        if lemma != term and "-" not in lemma and "_" not in lemma:
             return lemma
 
 
-def Query(query_string, dictionary, tfidf, index):
+def Query(query_string, dictionary, tfidf, index, id_list):
     global best_synonym, best_disambiguated_word
     query_document = Tokenize([query_string], exceptions=["and", "or", "not"])[0]
 
@@ -56,9 +58,15 @@ def Query(query_string, dictionary, tfidf, index):
         else:
             expanded_query.append(term)  # Keep the operator in its place
 
-    logical_exp = queryToDfn(query_document)
+    expanded_query = expanded_query[:8]
+    if len(expanded_query) > 0 and expanded_query[-1] in ["and", "or", "not"]:
+        expanded_query = expanded_query[:-1]
 
-    logical_exp_expanded = queryToDfn(expanded_query)
+    query_document = ReplaceReservedKeywords(query_document)
+    expanded_query = ReplaceReservedKeywords(expanded_query)
+
+    logical_exp = QueryToDfn(query_document)
+    logical_exp_expanded = QueryToDfn(expanded_query)
 
     relevant_docs = performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index)
     relevant_docs_expanded = performTfIdfQuery(expanded_query, logical_exp_expanded, dictionary, tfidf, index)
@@ -70,13 +78,12 @@ def Query(query_string, dictionary, tfidf, index):
 
     for docId, docScore in relevant_docs_expanded:
         if docId in relevant_join_dict:
-            relevant_join_dict[docId] += (docScore/2)
+            relevant_join_dict[docId] += (docScore / 2)
         else:
-            relevant_join_dict[docId] = (docScore/2)
+            relevant_join_dict[docId] = (docScore / 2)
 
     result = sorted(relevant_join_dict.items(), key=lambda x: x[1], reverse=True)
-
-    return result[:20]
+    return [(id_list[i[0]], i[1]) for i in result[:20]]
 
 
 def evaluateExpression(expr, sims_dict):
@@ -88,8 +95,7 @@ def evaluateExpression(expr, sims_dict):
         for clause in clauses[1:]:
             relevant_docs = relevant_docs.intersection(evaluateExpression(clause, sims_dict))
     elif isinstance(expr, Or):
-        relevant_docs = set([docId for (docId, docScore) in sims_dict[str(clauses[0])] if docScore > 0.0])
-        for clause in clauses[1:]:
+        for clause in clauses:
             relevant_docs = relevant_docs.union(evaluateExpression(clause, sims_dict))
     elif isinstance(expr, Not):
         notOccurrences = [docId for (docId, docScore) in sims_dict[str(expr.args[0])] if docScore < 0.000001]
@@ -103,6 +109,9 @@ def evaluateExpression(expr, sims_dict):
 def performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index):
     # Parse the logical expression to get the individual symbols (terms)
     terms = query_document
+
+    if logical_exp is None:
+        return []
 
     # Perform a TF-IDF query for each term and store the results in a dictionary
     sims_dict = {}
@@ -126,22 +135,4 @@ def performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index):
     return result
 
 
-def queryToDfn(query_document):
-    operators = ["and", "or", "not"]
 
-    temp = ""
-    for i in range(len(query_document)):
-        if i == len(query_document) - 1:
-            temp += query_document[i]
-        elif query_document[i] not in operators and (
-                query_document[i + 1] not in operators or query_document[i + 1] == "not"):
-            temp += query_document[i] + " and "
-        else:
-            temp += query_document[i] + " "
-
-    processed_query = temp.replace("and", "&").replace("or", "|").replace("not", "~")
-
-    query_expr = sympify(processed_query, evaluate=False)
-    query_dnf = to_dnf(query_expr, simplify=True)
-
-    return query_dnf
