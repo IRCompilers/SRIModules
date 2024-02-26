@@ -12,10 +12,10 @@ QUERY_AMOUNT = 200
 
 if __name__ == "__main__":
 
+    base_path = os.path.join("..", "data")
     vector_path = os.path.join("..", "data", "vectorized_data.pkl")
-    doc_path = os.path.join("..", "data", "tokenized_documents.txt")
 
-    dataset, tokenized_documents = PopulateDocuments(doc_path, DOC_AMOUNT)
+    dataset, tokenized_documents = PopulateDocuments(base_path, DOC_AMOUNT)
 
     # Load the queries for the dataset
     queries = [(query.query_id, query.text) for query in dataset.queries_iter()]
