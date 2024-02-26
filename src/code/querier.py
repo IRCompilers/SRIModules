@@ -7,7 +7,7 @@ from src.code.boolean_utils import QueryToDfn, ReplaceReservedKeywords
 from src.code.tokenizer import Tokenize
 
 
-def get_synonyms(word):
+def getSynonyms(word):
     synonyms = []
     for syn in wordnet.synsets(word):
         for lemma in syn.lemmas():
@@ -38,7 +38,7 @@ def Query(query_string, dictionary, tfidf, index, id_list):
     expanded_query = []
     for term in query_document:
         if term.lower() not in ["and", "or", "not"]:
-            synonyms = get_synonyms(term)
+            synonyms = getSynonyms(term)
             disambiguated_words = disambiguate(term, query_string)
 
             if synonyms:

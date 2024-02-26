@@ -5,6 +5,7 @@ RESERVED_KEYWORDS = {
     "take": "take_keyword",
     "public": "public_keyword",
     "sequence": "sequence_keyword",
+    "open": "open_keyword",
 }
 
 
@@ -41,8 +42,8 @@ def QueryToDfn(query_document):
         query_dnf = to_dnf(query_expr, simplify=True, force=True)
         return query_dnf
     except SympifyError as e:
-        print(f"Error in parsing query: {processed_query}: {e}")
         return None
     except TypeError as e:
         print(f"Error in parsing query: {processed_query}: {e}")
         return None
+

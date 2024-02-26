@@ -1,3 +1,5 @@
+import pickle
+
 TOKENIZED_DOCUMENTS_FILENAME = "tokenized_documents.txt"
 
 
@@ -11,3 +13,9 @@ def LoadDocuments(path):
     with open(path, "r") as f:
         tokenized_documents = [line.split() for line in f]
     return [(doc[0], doc[1:]) for doc in tokenized_documents]
+
+
+def LoadVectorizedData(file):
+    with open(file, 'rb') as f:
+        dictionary, corpus, tfidf, index = pickle.load(f)
+    return dictionary, corpus, tfidf, index
