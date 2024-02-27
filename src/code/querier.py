@@ -89,8 +89,6 @@ def Query(query_string, dictionary, tfidf, index, id_list):
 def evaluateExpression(expr, sims_dict):
     clauses = expr.args
 
-    print(clauses)
-
     relevant_docs = set()
     if isinstance(expr, And):
         relevant_docs = set([docId for (docId, docScore) in sims_dict[str(clauses[0])] if docScore > 0.0])
@@ -100,7 +98,6 @@ def evaluateExpression(expr, sims_dict):
         for clause in clauses:
             relevant_docs = relevant_docs.union(evaluateExpression(clause, sims_dict))
     elif isinstance(expr, Not):
-        print("Clause[0]", clauses[0])
         term = str(clauses[0]).replace("_keyword", "")
         notOccurrences = [docId for (docId, docScore) in sims_dict[term] if docScore < 0.000001]
         relevant_docs = set(notOccurrences)
@@ -114,11 +111,6 @@ def evaluateExpression(expr, sims_dict):
                 relevant_docs = set([docId for (docId, docScore) in sims_dict[term] if docScore > 0.0])
             except KeyError as e:
                 return set()
-    # elif isinstance(expr, Not):
-    #     notOccurrences = [docId for (docId, docScore) in sims_dict[str(expr.args[0])] if docScore < 0.000001]
-    #     relevant_docs = set(notOccurrences)
-    # else:
-    #     relevant_docs = set([docId for (docId, docScore) in sims_dict[str(expr)] if docScore > 0.0])
 
     return relevant_docs
 
@@ -160,7 +152,7 @@ def performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index):
     partial_match_docs = sorted(partial_match_docs, key=lambda x: x[1], reverse=True)[:10]
 
     # Append the partially matching documents to the relevant_docs list
-    relevant_docs.extend(partial_match_docs)
+    relevant_docs.extend([doc for doc in partial_match_docs if doc[1] > 0.0])
 
     return relevant_docs
 

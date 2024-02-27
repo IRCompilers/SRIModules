@@ -18,7 +18,7 @@ if __name__ == "__main__":
 
     vector_path = os.path.join("..", "..", "data", "vectorized_data.pkl")
     dictionary, corpus, tfidf, index = Vectorize(doc_words, vector_path)
-    query = "vaccine"
+    query = "vaccine or pharmaceutical and epidemics"
     query_results = Query(query, dictionary, tfidf, index, doc_ids)
     results = [(id, score, docs_text_raw[id]) for id, score in query_results]
 
