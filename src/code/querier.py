@@ -89,6 +89,8 @@ def Query(query_string, dictionary, tfidf, index, id_list):
 def evaluateExpression(expr, sims_dict):
     clauses = expr.args
 
+    print(clauses)
+
     relevant_docs = set()
     if isinstance(expr, And):
         relevant_docs = set([docId for (docId, docScore) in sims_dict[str(clauses[0])] if docScore > 0.0])
@@ -98,10 +100,25 @@ def evaluateExpression(expr, sims_dict):
         for clause in clauses:
             relevant_docs = relevant_docs.union(evaluateExpression(clause, sims_dict))
     elif isinstance(expr, Not):
-        notOccurrences = [docId for (docId, docScore) in sims_dict[str(expr.args[0])] if docScore < 0.000001]
+        print("Clause[0]", clauses[0])
+        term = str(clauses[0]).replace("_keyword", "")
+        notOccurrences = [docId for (docId, docScore) in sims_dict[term] if docScore < 0.000001]
         relevant_docs = set(notOccurrences)
     else:
-        relevant_docs = set([docId for (docId, docScore) in sims_dict[str(expr)] if docScore > 0.0])
+        try:
+            term = str(clauses[0]).replace("_keyword", "")
+            relevant_docs = set([docId for (docId, docScore) in sims_dict[term] if docScore > 0.0])
+        except IndexError as e:
+            try:
+                term = str(expr).replace("_keyword", "")
+                relevant_docs = set([docId for (docId, docScore) in sims_dict[term] if docScore > 0.0])
+            except KeyError as e:
+                return set()
+    # elif isinstance(expr, Not):
+    #     notOccurrences = [docId for (docId, docScore) in sims_dict[str(expr.args[0])] if docScore < 0.000001]
+    #     relevant_docs = set(notOccurrences)
+    # else:
+    #     relevant_docs = set([docId for (docId, docScore) in sims_dict[str(expr)] if docScore > 0.0])
 
     return relevant_docs
 
@@ -121,18 +138,31 @@ def performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index):
         sims_dict[term] = [(docId, docScore) for (docId, docScore) in enumerate(sims)]
 
     # Evaluate the logical expression using the dictionary of similarity scores
-    relevant_docs = evaluateExpression(logical_exp, sims_dict)
+    relevant_doc_ids = evaluateExpression(logical_exp, sims_dict)
 
-    result = []
-    for doc in relevant_docs:
+    # Create a list to store the documents that fully match the expression
+    relevant_docs = []
+    for docId in relevant_doc_ids:
         docScore = 0
         for term in sims_dict.keys():
-            id, score = sims_dict[term][doc]
+            id, score = sims_dict[term][docId]
             docScore += score
+        relevant_docs.append((docId, docScore))
 
-        result.append((doc, docScore))
+    # Create a list to store the documents that partially match the expression
+    partial_match_docs = []
+    for term, docs in sims_dict.items():
+        for docId, docScore in docs:
+            if docId not in relevant_doc_ids:
+                partial_match_docs.append((docId, docScore))
 
-    return result
+    # Sort the list by score in descending order and take the topmost documents
+    partial_match_docs = sorted(partial_match_docs, key=lambda x: x[1], reverse=True)[:10]
+
+    # Append the partially matching documents to the relevant_docs list
+    relevant_docs.extend(partial_match_docs)
+
+    return relevant_docs
 
 
 
