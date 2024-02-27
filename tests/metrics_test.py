@@ -7,8 +7,8 @@ from src.code.populate import PopulateDocuments
 from src.code.querier import Query
 from src.code.vectorizer import Vectorize
 
-DOC_AMOUNT = 5000
-QUERY_AMOUNT = 200
+DOC_AMOUNT = 50000
+QUERY_AMOUNT = 100
 
 if __name__ == "__main__":
 

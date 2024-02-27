@@ -83,7 +83,7 @@ def Query(query_string, dictionary, tfidf, index, id_list):
             relevant_join_dict[docId] = (docScore / 2)
 
     result = sorted(relevant_join_dict.items(), key=lambda x: x[1], reverse=True)
-    return [(id_list[i[0]], i[1]) for i in result[:85]]
+    return [(id_list[i[0]], i[1]) for i in result]
 
 
 def evaluateExpression(expr, sims_dict):

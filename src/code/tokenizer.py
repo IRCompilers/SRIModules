@@ -1,16 +1,21 @@
 import spacy
 
-nlp = spacy.load("en_core_web_sm")
+nlp = spacy.load("en_core_web_sm", enable=["lemmatizer"])
 
 
-def Tokenize(documents, exceptions=None, n_process=1, show_logs=False):
+def Tokenize(documents, exceptions=None, n_process=-1, batch_size=500, show_logs=False):
     tokenized_documents = []
 
     if exceptions is None:
         exceptions = []
 
+    if len(documents) == 1:
+        tokenized_doc = [token.lemma_ for token in nlp(documents[0]) if
+                         token.lemma_ in exceptions or (not token.is_stop and token.is_alpha and len(token.lemma_) > 1)]
+        return [tokenized_doc]
+
     i = 1
-    for doc in nlp.pipe(documents, disable=["tagger", "parser", "ner"], n_process=n_process):
+    for doc in nlp.pipe(documents, n_process=n_process, batch_size=batch_size):
         tokenized_doc = [token.lemma_ for token in doc if
                          token.lemma_ in exceptions or (not token.is_stop and token.is_alpha and len(token.lemma_) > 1)]
 
