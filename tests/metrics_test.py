@@ -4,14 +4,12 @@ import pandas as pd
 from sklearn.metrics import precision_score, recall_score, f1_score, fbeta_score
 
 from src.code.boolean_model import BooleanModel
-from src.code.boolean_utils import Evaluate
 from src.code.populate import PopulateDocuments
 from src.code.querier import Querier
-from src.code.tokenizer import Tokenize
 from src.code.vectorizer import Vectorize
 
 DOC_AMOUNT = 50000
-QUERY_AMOUNT = 5
+QUERY_AMOUNT = 30
 
 if __name__ == "__main__":
     base_path = os.path.join("..", "data")
@@ -45,10 +43,7 @@ if __name__ == "__main__":
         if int(qrel.query_id) > QUERY_AMOUNT:
             break
 
-        if qrel.relevance < 1:
-            continue
-
-        if qrel.doc_id not in doc_set:
+        if qrel.relevance < 1 or qrel.doc_id not in doc_set:
             continue
 
         if qrel.query_id in grouped_qrels:
@@ -70,13 +65,7 @@ if __name__ == "__main__":
 
     query = queries[0][1]
 
-    # tokenized = Tokenize([query])
-    # evaluated = Evaluate(tokenized[0], doc_text, dictionary)
-    # print(evaluated)
-
     model = BooleanModel(tokenized_documents, dictionary)
-
-
 
     for query_to_test in queries[:QUERY_AMOUNT]:
         boolean_qrel = model.Query(query_to_test[1])

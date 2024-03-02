@@ -1,6 +1,4 @@
-from typing import List
-
-from astroid import Expr
+import spacy
 from sympy import sympify, to_dnf, SympifyError
 
 RESERVED_KEYWORDS = {
@@ -11,6 +9,7 @@ RESERVED_KEYWORDS = {
     "open": "open_keyword",
 }
 
+nlp = spacy.load("en_core_web_sm", disable=["ner", "parser", "textcat", "lemmatizer"])
 
 def ReplaceReservedKeywords(tokenized_query):
     for i in range(len(tokenized_query)):
@@ -66,45 +65,36 @@ def Evaluate(query, documents, dictionary, is_dnf=False):
 
 def QueryToDfn(query_document):
     # Initialize an empty string to store the processed query
-
     processed_query = ""
 
-    operators = ['&', '|', '~', '(', ')']
-    for i, token in enumerate(query_document):
+    operators = ['and', 'or', 'not', '(', ')', '&', '|', '~']
+    query_document = " ".join(query_document)
 
-        if token in operators:
-            processed_query += " " + token + " "
+    print(query_document)
+
+    # Tokenize the query_document and perform POS tagging
+    doc = nlp(query_document)
+    print(doc)
+
+    for i, token in enumerate(doc):
+        if token.text in operators:
+            processed_query += " " + token.text + " "
         else:
-            processed_query += " " + token
-            if i + 1 < len(query_document) and query_document[i + 1] not in operators:
+            processed_query += " " + token.text
+            if i + 1 < len(doc) and doc[i + 1].text not in operators:
                 processed_query += " &"
 
     processed_query = processed_query.replace(" and ", " & ").replace(" or ", " | ").replace(" not ", " ~ ")
 
-    # # Iterate over the tokens in the parsed query
-    # for i, token in enumerate(query_document):
-    #     # If the token is an operator, replace it with the corresponding logical operator
-    #     if token.lower() in ["and", "or", "not"]:
-    #         processed_query += " " + token.lower() + " "
-    #     # If the token is a term, add it to the processed query
-    #     else:
-    #         processed_query += " " + token
-    #         # If the next token is not an operator, add the default operator
-    #         if i + 1 < len(query_document) and query_document[i + 1].lower() not in ["and", "or", "not"]:
-    #             # If the current token and the next token are both nouns or both adjectives, use "OR"
-    #             processed_query += " or"
-    #
-    # # Replace the operators with their corresponding symbols
-    # processed_query = processed_query.replace(" and ", " & ").replace(" or ", " | ").replace(" not ", " ~")
-    #
     if len(processed_query) == 0:
         return None
-    #
+
     try:
         query_expr = sympify(processed_query, evaluate=False)
         query_dnf = to_dnf(query_expr, simplify=True, force=True)
         return query_dnf
     except SympifyError as e:
+        print(f"Error in parsing query: {processed_query}: {e}")
         return None
     except TypeError as e:
         print(f"Error in parsing query: {processed_query}: {e}")
