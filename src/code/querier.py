@@ -1,160 +1,126 @@
-import nltk
-from nltk.corpus import wordnet
-from nltk.wsd import lesk
-from sympy import sympify, to_dnf, And, Or, Not, SympifyError
+import os
+import pickle
 
-from src.code.boolean_utils import QueryToDfn, ReplaceReservedKeywords
+from src.code.boolean_utils import QueryToDfn, ReplaceReservedKeywords, Evaluate
+from src.code.expansion import expand_query
 from src.code.tokenizer import Tokenize
 
 
-def getSynonyms(word):
-    synonyms = []
-    for syn in wordnet.synsets(word):
-        for lemma in syn.lemmas():
-            if len(lemma.name()) > 1:
-                synonyms.append(lemma.name())
-    return synonyms
+class Querier:
+    def __init__(self, id_list, corpus, filepath, dictionary, tfidf, index):
+        self.dictionary = dictionary
+        self.tfidf = tfidf
+        self.index = index
+        self.id_list = id_list
+        self.global_vector = [1.0] * len(id_list)
+        self.momentum_vector = [0] * len(id_list)
+        self.corpus = corpus
+        self.adjust_batch_count = 0
+        self.global_vector_file = os.path.join(filepath, "global_vector.pkl")
+        self.momentum_vector_file = os.path.join(filepath, "momentum_vector.pkl")
 
-
-def disambiguate(word, sentence):
-    best_synset = lesk(nltk.word_tokenize(sentence), word)
-    if best_synset is not None:
-        return [name for name in best_synset.lemma_names() if len(name) > 1]
-    else:
-        return []
-
-
-def getFirstNotEqual(lemmas, term):
-    for lemma in lemmas:
-        if lemma != term and "-" not in lemma and "_" not in lemma:
-            return lemma
-
-
-def Query(query_string, dictionary, tfidf, index, id_list):
-    global best_synonym, best_disambiguated_word
-    query_document = Tokenize([query_string], exceptions=["and", "or", "not"])[0]
-
-    # Expand the query
-    expanded_query = []
-    for term in query_document:
-        if term.lower() not in ["and", "or", "not"]:
-            synonyms = getSynonyms(term)
-            disambiguated_words = disambiguate(term, query_string)
-
-            if synonyms:
-                best_synonym = getFirstNotEqual(synonyms, term)
-
-            if disambiguated_words:
-                best_disambiguated_word = getFirstNotEqual(disambiguated_words, term)
-
-            if synonyms and best_synonym and disambiguated_words and best_disambiguated_word:
-                expanded_query.append(best_synonym)
-                expanded_query.append("or")
-                expanded_query.append(best_disambiguated_word)
-            elif synonyms and best_synonym:
-                expanded_query.append(best_synonym)
-            elif disambiguated_words and best_disambiguated_word:
-                expanded_query.append(best_disambiguated_word)  # Add the best disambiguated word
+        if os.path.exists(self.global_vector_file) and os.path.exists(self.momentum_vector_file):
+            with open(self.global_vector_file, 'rb') as f:
+                self.global_vector = pickle.load(f)
+            with open(self.momentum_vector_file, 'rb') as f:
+                self.momentum_vector = pickle.load(f)
         else:
-            expanded_query.append(term)  # Keep the operator in its place
+            self.global_vector = [1.0] * len(id_list)
+            self.momentum_vector = [0] * len(id_list)
 
-    expanded_query = expanded_query[:8]
-    if len(expanded_query) > 0 and expanded_query[-1] in ["and", "or", "not"]:
-        expanded_query = expanded_query[:-1]
+    def Query(self, query_string):
+        query_document = Tokenize([query_string], exceptions=["and", "or", "not"])[0]
 
-    query_document = ReplaceReservedKeywords(query_document)
-    expanded_query = ReplaceReservedKeywords(expanded_query)
+        query_document = ReplaceReservedKeywords(query_document)
+        logical_exp = QueryToDfn(query_document)
+        relevant_docs = self.performTfIdfQuery(query_document, logical_exp)
 
-    logical_exp = QueryToDfn(query_document)
-    logical_exp_expanded = QueryToDfn(expanded_query)
+        # Extract the terms from the relevant documents
+        feedback_docs = []
+        for docId, docScore in relevant_docs:
+            doc_terms = self.corpus[docId]
+            feedback_docs.extend(doc_terms)
 
-    relevant_docs = performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index)
-    relevant_docs_expanded = performTfIdfQuery(expanded_query, logical_exp_expanded, dictionary, tfidf, index)
+        expanded_query = expand_query(query_document, feedback_docs, num_terms_to_add=2)
+        relevant_docs = self.performTfIdfQuery(expanded_query, logical_exp)
 
-    relevant_join_dict = {}
+        adjusted_scores = {docId: docScore * self.global_vector[docId] for docId, docScore in relevant_docs}
 
-    for docId, docScore in relevant_docs:
-        relevant_join_dict[docId] = docScore
+        result = sorted(adjusted_scores.items(), key=lambda x: x[1], reverse=True)
 
-    for docId, docScore in relevant_docs_expanded:
-        if docId in relevant_join_dict:
-            relevant_join_dict[docId] += (docScore / 2)
+        self.adjustGlobalVector([i[0] for i in result])
+
+        result = [(self.id_list[i[0]], i[1]) for i in result if i[1] > 0.1]
+        return result
+
+    def adjustGlobalVector(self, relevant_docs, alpha=5, beta=0.1):
+        mask = [False] * len(self.global_vector)
+        for docId in relevant_docs:
+            mask[docId] = True
+            if self.momentum_vector[docId] < 0:
+                self.momentum_vector[docId] = 1
+            else:
+                self.momentum_vector[docId] += 1
+            self.global_vector[docId] += alpha * abs(self.momentum_vector[docId])
+
+        for i in range(len(self.global_vector)):
+            if not mask[i]:
+                if self.momentum_vector[i] > 0:
+                    self.momentum_vector[i] = -1
+                else:
+                    self.momentum_vector[i] -= 1
+                self.global_vector[i] -= beta * abs(self.momentum_vector[i])
+
+        self.adjust_batch_count += 1
+        if self.adjust_batch_count % 10 == 0:
+            with open(self.global_vector_file, 'wb') as f:
+                pickle.dump(self.global_vector, f)
+            with open(self.momentum_vector_file, 'wb') as f:
+                pickle.dump(self.momentum_vector, f)
+
+    def performTfIdfQuery(self, query_document, logical_exp):
+        # Parse the logical expression to get the individual symbols (terms)
+
+        if logical_exp is None:
+            return []
+
+        # Evaluate the logical expression using the dictionary of similarity scores
+        relevant_doc_ids = Evaluate(query_document, self.corpus, self.dictionary)
+
+        query_len = len(query_document)
+
+        for term in range(query_len):
+
+            if term >= len(query_document):
+                break
+
+            if query_document[term] == "not" and term + 1 < len(query_document):
+                query_document = query_document[:term] + query_document[term + 1:]
+
+        # Convert the query document to a bag-of-words vector
+        query_bow = self.dictionary.doc2bow(query_document)
+
+        # Convert the bag-of-words vector to a tf-idf vector
+        query_tfidf = self.tfidf[query_bow]
+
+        # Compute the similarity matrix between the query tf-idf vector and the entire corpus
+        sims = self.index[query_tfidf]
+
+        relevant_sims = [(docId, sims[docId]) for docId in relevant_doc_ids]
+
+        filtered_sims = [(docId, sims[docId]) for docId in range(len(sims)) if
+                         sims[docId] > 0.0 and docId not in relevant_doc_ids]
+
+        # Sort the documents by their similarity scores in descending order
+        sorted_sims = sorted(filtered_sims, key=lambda x: x[1], reverse=True)
+
+        if len(relevant_sims) > 40:
+            strong_amount = 10
         else:
-            relevant_join_dict[docId] = (docScore / 2)
+            strong_amount = 40 - len(relevant_sims)
 
-    result = sorted(relevant_join_dict.items(), key=lambda x: x[1], reverse=True)
-    return [(id_list[i[0]], i[1]) for i in result]
+        strong_docs = sorted_sims[:strong_amount]
 
-
-def evaluateExpression(expr, sims_dict):
-    clauses = expr.args
-
-    relevant_docs = set()
-    if isinstance(expr, And):
-        relevant_docs = set([docId for (docId, docScore) in sims_dict[str(clauses[0])] if docScore > 0.0])
-        for clause in clauses[1:]:
-            relevant_docs = relevant_docs.intersection(evaluateExpression(clause, sims_dict))
-    elif isinstance(expr, Or):
-        for clause in clauses:
-            relevant_docs = relevant_docs.union(evaluateExpression(clause, sims_dict))
-    elif isinstance(expr, Not):
-        term = str(clauses[0]).replace("_keyword", "")
-        notOccurrences = [docId for (docId, docScore) in sims_dict[term] if docScore < 0.000001]
-        relevant_docs = set(notOccurrences)
-    else:
-        try:
-            term = str(clauses[0]).replace("_keyword", "")
-            relevant_docs = set([docId for (docId, docScore) in sims_dict[term] if docScore > 0.0])
-        except IndexError as e:
-            try:
-                term = str(expr).replace("_keyword", "")
-                relevant_docs = set([docId for (docId, docScore) in sims_dict[term] if docScore > 0.0])
-            except KeyError as e:
-                return set()
-
-    return relevant_docs
-
-
-def performTfIdfQuery(query_document, logical_exp, dictionary, tfidf, index):
-    # Parse the logical expression to get the individual symbols (terms)
-    terms = query_document
-
-    if logical_exp is None:
-        return []
-
-    # Perform a TF-IDF query for each term and store the results in a dictionary
-    sims_dict = {}
-    for term in terms:
-        query_bow = dictionary.doc2bow([term])
-        sims = index[tfidf[query_bow]]
-        sims_dict[term] = [(docId, docScore) for (docId, docScore) in enumerate(sims)]
-
-    # Evaluate the logical expression using the dictionary of similarity scores
-    relevant_doc_ids = evaluateExpression(logical_exp, sims_dict)
-
-    # Create a list to store the documents that fully match the expression
-    relevant_docs = []
-    for docId in relevant_doc_ids:
-        docScore = 0
-        for term in sims_dict.keys():
-            id, score = sims_dict[term][docId]
-            docScore += score
-        relevant_docs.append((docId, docScore))
-
-    # Create a list to store the documents that partially match the expression
-    partial_match_docs = []
-    for term, docs in sims_dict.items():
-        for docId, docScore in docs:
-            if docId not in relevant_doc_ids:
-                partial_match_docs.append((docId, docScore))
-
-    # Sort the list by score in descending order and take the topmost documents
-    partial_match_docs = sorted(partial_match_docs, key=lambda x: x[1], reverse=True)[:10]
-
-    # Append the partially matching documents to the relevant_docs list
-    relevant_docs.extend([doc for doc in partial_match_docs if doc[1] > 0.0])
-
-    return relevant_docs
-
-
-
+        # Extend the list of relevant documents with the top 20 documents
+        relevant_docs = relevant_sims + strong_docs
+        return relevant_docs

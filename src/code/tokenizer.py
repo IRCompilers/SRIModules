@@ -6,6 +6,9 @@ nlp = spacy.load("en_core_web_sm", enable=["lemmatizer"])
 def Tokenize(documents, exceptions=None, n_process=-1, batch_size=500, show_logs=False):
     tokenized_documents = []
 
+    for i in range(len(documents)):
+        documents[i] = documents[i].replace("-", " ")
+
     if exceptions is None:
         exceptions = []
 

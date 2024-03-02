@@ -7,7 +7,7 @@ from src.code.tokenizer import Tokenize
 
 
 def PopulateDocuments(base_path, doc_amount):
-    dataset = ir_datasets.load('beir/trec-covid')
+    dataset = ir_datasets.load("beir/trec-covid")
 
     tokenized_path = os.path.join(base_path, "tokenized_documents.txt")
     documents_path = os.path.join(base_path, "documents.txt")
