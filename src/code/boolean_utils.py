@@ -7,9 +7,11 @@ RESERVED_KEYWORDS = {
     "public": "public_keyword",
     "sequence": "sequence_keyword",
     "open": "open_keyword",
+    "use": "use_keyword"
 }
 
 nlp = spacy.load("en_core_web_sm", disable=["ner", "parser", "textcat", "lemmatizer"])
+
 
 def ReplaceReservedKeywords(tokenized_query):
     for i in range(len(tokenized_query)):
@@ -70,11 +72,8 @@ def QueryToDfn(query_document):
     operators = ['and', 'or', 'not', '(', ')', '&', '|', '~']
     query_document = " ".join(query_document)
 
-    print(query_document)
-
     # Tokenize the query_document and perform POS tagging
     doc = nlp(query_document)
-    print(doc)
 
     for i, token in enumerate(doc):
         if token.text in operators:
