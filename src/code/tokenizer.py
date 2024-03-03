@@ -1,4 +1,8 @@
+import warnings
+
 import spacy
+
+warnings.filterwarnings("ignore", category=UserWarning, module='spacy')
 
 nlp = spacy.load("en_core_web_sm", enable=["lemmatizer"])
 

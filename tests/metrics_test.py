@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.metrics import precision_score, recall_score, f1_score, fbeta_score
 
 from src.code.boolean_model import BooleanModel
+from src.code.canonical import Canonical
 from src.code.populate import PopulateDocuments
 from src.code.querier import Querier
 from src.code.vectorizer import Vectorize
@@ -29,8 +30,12 @@ if __name__ == "__main__":
     y_true = []
     y_bool_pred = []
     y_ext_pred = []
+    y_can_pred = []
 
+    bool_model = BooleanModel(tokenized_documents, dictionary)
     ext_model = Querier(doc_ids, doc_text, base_path, dictionary, tfidf, index)
+    can_model = Canonical(corpus, dictionary, tfidf, index, doc_ids)
+
     qrels = [qrel for qrel in dataset.qrels_iter()]
 
     # GRoup qrels by query_id and then sort by relevance
@@ -51,6 +56,12 @@ if __name__ == "__main__":
         else:
             grouped_qrels[qrel.query_id] = [qrel]
 
+    precisions_can = []
+    recalls_can = []
+    f1s_can = []
+    f3s_can = []
+    r_precisions_can = []
+
     precisions_bool = []
     recalls_bool = []
     f1s_bool = []
@@ -68,29 +79,38 @@ if __name__ == "__main__":
     model = BooleanModel(tokenized_documents, dictionary)
 
     for query_to_test in queries[:QUERY_AMOUNT]:
-        boolean_qrel = model.Query(query_to_test[1])
-        my_qrel = ext_model.Query(query_to_test[1])
-        my_qrel = set([doc_id for doc_id, doc_score in my_qrel])
         query_id = query_to_test[0]
+
+        boolean_qrel = [(doc_id, 1) for doc_id in model.Query(query_to_test[1])]
+        ext_qrel = ext_model.Query(query_to_test[1])
+        can_qrel = can_model.Query(query_to_test[1])
+        real_qrel = [qrel.doc_id for qrel in grouped_qrels.get(query_id)]
+
+        boolean_qrel_ids = [doc_id for doc_id, _ in boolean_qrel]
+        ext_qrel_ids = [doc_id for doc_id, doc_score in ext_qrel]
+        can_qrel_ids = [doc_id for doc_id, doc_score in can_qrel]
 
         for doc_id in doc_ids:
 
-            if doc_id in my_qrel:
+            if doc_id in ext_qrel_ids:
                 y_ext_pred.append(1)
             else:
                 y_ext_pred.append(0)
 
-            if doc_id in boolean_qrel:
+            if doc_id in boolean_qrel_ids:
                 y_bool_pred.append(1)
             else:
                 y_bool_pred.append(0)
 
-            doc_in_query = [qrel.doc_id for qrel in grouped_qrels.get(query_id)]
-
-            if doc_id in doc_in_query:
+            if doc_id in real_qrel:
                 y_true.append(1)
             else:
                 y_true.append(0)
+
+            if doc_id in can_qrel_ids:
+                y_can_pred.append(1)
+            else:
+                y_can_pred.append(0)
 
         # Calculate metrics for the boolean model
         precisions_bool.append(precision_score(y_true, y_bool_pred))
@@ -104,14 +124,22 @@ if __name__ == "__main__":
         f1s.append(f1_score(y_true, y_ext_pred))
         f3s.append(fbeta_score(y_true, y_ext_pred, beta=3))
 
+        # Calculate metrics for the canonical model
+        precisions_can.append(precision_score(y_true, y_can_pred))
+        recalls_can.append(recall_score(y_true, y_can_pred))
+        f1s_can.append(f1_score(y_true, y_can_pred))
+        f3s_can.append(fbeta_score(y_true, y_can_pred, beta=3))
+
         # Calculate r precisions
         strong_amount = 10
         r_precisions.append(precision_score(y_true[:strong_amount], y_ext_pred[:strong_amount]))
         r_precisions_bool.append(precision_score(y_true[:strong_amount], y_bool_pred[:strong_amount]))
+        r_precisions_can.append(precision_score(y_true[:strong_amount], y_can_pred[:strong_amount]))
 
         y_true = []
         y_bool_pred = []
         y_ext_pred = []
+        y_can_pred = []
 
     data = [
         {
@@ -129,6 +157,14 @@ if __name__ == "__main__":
             'F1 Score': sum(f1s) / len(f1s),
             'F3 Score': sum(f3s) / len(f3s),
             'R-Precision': sum(r_precisions) / len(r_precisions)
+        },
+        {
+            'Model': 'Canonical',
+            'Precision': sum(precisions_can) / len(precisions_can),
+            'Recall': sum(recalls_can) / len(recalls_can),
+            'F1 Score': sum(f1s_can) / len(f1s_can),
+            'F3 Score': sum(f3s_can) / len(f3s_can),
+            'R-Precision': sum(r_precisions_can) / len(r_precisions_can)
         }
     ]
 
