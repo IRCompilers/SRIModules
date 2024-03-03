@@ -81,7 +81,10 @@ def QueryToDfn(query_document):
         else:
             processed_query += " " + token.text
             if i + 1 < len(doc) and doc[i + 1].text not in operators:
-                processed_query += " &"
+                if token.pos_ == ["NOUN"] and doc[i+1].pos_ == ["NOUN"]:
+                    processed_query += " or"
+                else:
+                    processed_query += " and"
 
     processed_query = processed_query.replace(" and ", " & ").replace(" or ", " | ").replace(" not ", " ~ ")
 
