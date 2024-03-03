@@ -7,6 +7,15 @@ from src.code.tokenizer import Tokenize
 
 
 def PopulateDocuments(base_path, doc_amount):
+    """
+    Returns the dataset and the tokenized documents previously saved. If they do not exist,
+    create its values from a specific dataset("beir/trec-covid") and return them.
+
+    :param base_path: str: Base path of the stored data
+    :param doc_amount: int: Amount of documents to process and save
+    :return:
+        Tuple[Dataset|List[List[str]]
+    """
     dataset = ir_datasets.load("beir/trec-covid")
 
     tokenized_path = os.path.join(base_path, "tokenized_documents.txt")

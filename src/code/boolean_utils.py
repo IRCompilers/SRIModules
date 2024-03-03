@@ -66,6 +66,12 @@ def Evaluate(query, documents, dictionary, is_dnf=False):
 
 
 def QueryToDfn(query_document):
+    """
+    Transform a query to a disjunctive normal form
+    :param query_document: List[List[str]]:
+    :return:
+        None | BooleanFunction
+    """
     # Initialize an empty string to store the processed query
     processed_query = ""
 

@@ -1,0 +1,7 @@
+gensim~=4.3.0
+spacy~=3.7.2
+scikit-learn~=1.4.0
+sympy~=1.12
+pandas~=2.2.1
+numpy~=1.26.4
+jupyter~=1.0.0

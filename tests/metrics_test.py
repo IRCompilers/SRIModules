@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     qrels = [qrel for qrel in dataset.qrels_iter()]
 
-    # GRoup qrels by query_id and then sort by relevance
+    # Group qrels by query_id and then sort by relevance
 
     doc_set = set(doc_ids)
 

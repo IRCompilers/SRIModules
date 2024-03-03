@@ -8,6 +8,26 @@ from src.code.vectorizer import Vectorize
 
 
 class Canonical:
+    """
+    A class representation of the actual Extended Boolean Model
+
+    Attributes
+    ----------
+    dictionary : corpora.Dictionary
+       a dictionary that maps each word to its "id"
+    tfidf: models.TfidfModel
+    index: similarities.SparseMatrixSimilarity
+    id_list: List[str]
+        a list that has the ids of the documents
+    corpus : List[List[Tuple[int, int]]]
+        represents all the tokenized documents with a bag of words representation
+    Methods
+    -------
+    Evaluate(logical_exp: BooleanFunction , p=2 : int)
+        Returns the documents that match with the specified logical expression
+    Query(query_string : str)
+        Returns the relevant documents from a query using the boolean model extended with some modifications
+    """
     def __init__(self, corpus, dictionary, tfidf, index, id_list):
         self.corpus = corpus
         self.dictionary = dictionary
