@@ -4,6 +4,18 @@ import numpy as np
 
 
 def calculate_term_probabilities(query, feedback_docs):
+    """
+    Calculate the probabilities of the terms
+
+    Parameters
+    ----------
+    query: List[str]
+    feedback_docs : List[List[str]]
+
+    Returns
+    -------
+    Tuple[Dict[str. float]|Dict[str. float]]
+    """
     query_term_counts = Counter(query)
     feedback_term_counts = Counter(feedback_docs)
 
@@ -17,6 +29,18 @@ def calculate_term_probabilities(query, feedback_docs):
 
 
 def calculate_kl_divergence(query_probabilities, feedback_probabilities):
+    """
+    Calculate the Kullback-Leibler divergence
+
+    Parameters
+    ----------
+    query_probabilities : Dict[str:float]
+    feedback_probabilities : Dict[str:float]
+
+    Returns
+    -------
+    Dict[str:float]: Represents the KL value of the terms
+    """
     kl_divergence = {}
 
     for term, feedback_probability in feedback_probabilities.items():
@@ -27,6 +51,21 @@ def calculate_kl_divergence(query_probabilities, feedback_probabilities):
 
 
 def expand_query(query, feedback_docs, num_terms_to_add):
+    """
+    Given a query and some corpus expands the query.
+    It expands the query taking the terms with the highest KL divergence
+
+    Parameters
+    ----------
+    query: List[str]
+    feedback_docs : List[List[str]]
+    num_terms_to_add:int
+
+    Returns
+    -------
+    List[str]
+    """
+
     query_probabilities, feedback_probabilities = calculate_term_probabilities(query, feedback_docs)
     kl_divergence = calculate_kl_divergence(query_probabilities, feedback_probabilities)
 

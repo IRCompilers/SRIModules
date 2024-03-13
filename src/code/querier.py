@@ -82,6 +82,19 @@ class Querier:
         return result
 
     def adjustGlobalVector(self, relevant_docs, alpha=5, beta=0.1):
+        """
+        Update the global vector
+
+        Parameters
+        ----------
+        relevant_docs
+        alpha
+        beta
+
+        Returns
+        -------
+
+        """
         mask = [False] * len(self.global_vector)
         for docId in relevant_docs:
             mask[docId] = True
